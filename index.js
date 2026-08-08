@@ -3179,12 +3179,30 @@ function safeDualVerifyEnabled() {
   return paymentVerifyMode() === 'both';
 }
 
-function paymentMethodAddress(methodKey) {
+function paymentMethodAddress(methodKey, methodObj = null) {
   const key = String(methodKey || '').toUpperCase();
-  if (key === 'BYBIT_PAY' || key === 'BYBIT_USDT' || key === 'BYBIT') return db.settings.bybitUsdtAddress || process.env.BYBIT_USDT_ADDRESS || process.env.BYBIT_USDT_TRC20_ADDRESS || '';
-  if (key === 'USDT_BEP20') return db.settings.bep20Address || '';
-  if (key === 'BEP20') return db.settings.bep20Address || '';
-  return '';
+  if (methodObj) {
+    const directAddr = String(methodObj.address || methodObj.walletAddress || '').trim();
+    if (directAddr) return directAddr;
+  }
+  const m = (db.paymentMethods || []).find(x => String(x.key || '').toUpperCase() === key || String(x.id || '') === String(methodKey));
+  if (m) {
+    const mAddr = String(m.address || m.walletAddress || '').trim();
+    if (mAddr) return mAddr;
+  }
+  if (key === 'BYBIT_PAY' || key === 'BYBIT_USDT' || key === 'BYBIT') {
+    return db.settings.bybitUsdtAddress || process.env.BYBIT_USDT_ADDRESS || process.env.BYBIT_USDT_TRC20_ADDRESS || process.env.BYBIT_USDT_BEP20_ADDRESS || db.settings.trc20Address || process.env.TRC20_ADDRESS || 'Set Bybit Wallet Address in Web Admin → Payment Methods';
+  }
+  if (key === 'BINANCE_PAY') return db.settings.binanceId || process.env.BINANCE_ID || '1138472888';
+  if (key === 'UPI_PAY') return db.settings.upiId || process.env.UPI_ID || 'yourupi@paytm';
+  if (key === 'USDT_BEP20' || key === 'BEP20') return db.settings.bep20Address || process.env.BEP20_ADDRESS || process.env.BYBIT_USDT_BEP20_ADDRESS || 'Set BEP20 Address in Web Admin → Payment Methods';
+  if (key === 'USDT_TRC20' || key === 'TRC20') return db.settings.trc20Address || process.env.TRC20_ADDRESS || process.env.BYBIT_USDT_TRC20_ADDRESS || 'Set TRC20 Address in Web Admin → Payment Methods';
+  if (key === 'USDT_ERC20' || key === 'ERC20') return db.settings.erc20Address || process.env.ERC20_ADDRESS || 'Set ERC20 Address in Web Admin → Payment Methods';
+  if (key === 'USDT_POLYGON' || key === 'POLYGON') return db.settings.polygonAddress || process.env.POLYGON_ADDRESS || 'Set Polygon Address in Web Admin → Payment Methods';
+  if (key === 'SOL') return db.settings.solAddress || process.env.SOL_ADDRESS || 'Set SOL Address in Web Admin → Payment Methods';
+  if (key === 'LTC') return db.settings.ltcAddress || process.env.LTC_ADDRESS || 'Set LTC Address in Web Admin → Payment Methods';
+  if (key === 'BTC') return db.settings.btcAddress || process.env.BTC_ADDRESS || 'Set BTC Address in Web Admin → Payment Methods';
+  return m?.address || db.settings.bybitUsdtAddress || 'Set Wallet Address in Web Admin → Payment Methods';
 }
 
 function paymentMethodNetwork(methodKey) {
@@ -12683,13 +12701,13 @@ app.post('/admin-web/payments/:id/reject', async (req, res) => {
 });
 
 app.get('/admin-web/methods', (req, res) => {
-  const rows = db.paymentMethods.map(m => `<tr><td><b>${webEsc(m.id)}</b><br>${m.active === false ? '🔴 OFF' : '🟢 ON'}</td><td>${webEsc(m.icon || '💳')} ${webEsc(m.name)}</td><td><span class="code">${webEsc(m.key || '')}</span></td><td>${webEsc(short(m.details || '', 80))}</td><td><form method="post" action="/admin-web/methods/${encodeURIComponent(m.id)}/update"><div class="row"><input name="name" value="${webEsc(m.name)}"><input name="icon" value="${webEsc(m.icon || '')}"><input name="key" value="${webEsc(m.key || '')}"></div><textarea name="details">${webEsc(m.details || '')}</textarea><select name="active"><option value="true" ${m.active !== false ? 'selected' : ''}>ON</option><option value="false" ${m.active === false ? 'selected' : ''}>OFF</option></select><button class="btn">Save</button></form><form method="post" action="/admin-web/methods/${encodeURIComponent(m.id)}/delete" onsubmit="return confirm('Delete method?')"><button class="btn danger">Delete</button></form></td></tr>`).join('');
-  const body = `<div class="card"><h3>➕ Add Payment Method</h3><form method="post" action="/admin-web/methods/add"><div class="row"><input name="name" placeholder="USDT BEP20"><input name="icon" placeholder="🟨"><input name="key" placeholder="USDT_BEP20"></div><textarea name="details" placeholder="Payment address or instructions"></textarea><button class="btn">Add Method</button></form></div><br><div class="tableWrap"><table class="table"><thead><tr><th>ID</th><th>Name</th><th>Key</th><th>Details</th><th>Edit</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  const rows = db.paymentMethods.map(m => `<tr><td><b>${webEsc(m.id)}</b><br>${m.active === false ? '🔴 OFF' : '🟢 ON'}</td><td>${webEsc(m.icon || '💳')} ${webEsc(m.name)}</td><td><span class="code">${webEsc(m.key || '')}</span></td><td><b>Address:</b> <span class="code">${webEsc(paymentMethodAddress(m.key, m))}</span><br><span class="muted">${webEsc(short(m.details || '', 80))}</span></td><td><form method="post" action="/admin-web/methods/${encodeURIComponent(m.id)}/update"><div class="row"><input name="name" value="${webEsc(m.name)}"><input name="icon" value="${webEsc(m.icon || '')}"><input name="key" value="${webEsc(m.key || '')}"></div><div class="row"><input name="address" value="${webEsc(m.address || m.walletAddress || '')}" placeholder="Wallet Address / UID"></div><textarea name="details">${webEsc(m.details || '')}</textarea><select name="active"><option value="true" ${m.active !== false ? 'selected' : ''}>ON</option><option value="false" ${m.active === false ? 'selected' : ''}>OFF</option></select><button class="btn">Save</button></form><form method="post" action="/admin-web/methods/${encodeURIComponent(m.id)}/delete" onsubmit="return confirm('Delete method?')"><button class="btn danger">Delete</button></form></td></tr>`).join('');
+  const body = `<div class="card"><h3>➕ Add Payment Method</h3><form method="post" action="/admin-web/methods/add"><div class="row"><input name="name" placeholder="Bybit Pay USDT"><input name="icon" placeholder="🟡"><input name="key" placeholder="BYBIT_PAY"></div><div class="row"><input name="address" placeholder="Wallet Address / Bybit UID (e.g. TRX... or 0x... or 1234567)"></div><textarea name="details" placeholder="Payment instructions / notes"></textarea><button class="btn">Add Method</button></form></div><br><div class="tableWrap"><table class="table"><thead><tr><th>ID</th><th>Name</th><th>Key</th><th>Address & Details</th><th>Edit</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   res.send(adminLayout('Payment Methods', body, req.query.msg));
 });
 
 app.post('/admin-web/methods/add', (req, res) => {
-  const m = { id: nextPaymentMethodId(), name: String(req.body.name || 'New Method').trim(), icon: String(req.body.icon || '💳').trim().slice(0,8), key: String(req.body.key || 'MANUAL').trim().toUpperCase().replace(/\s+/g,'_'), details: String(req.body.details || '').trim(), active: true };
+  const m = { id: nextPaymentMethodId(), name: String(req.body.name || 'New Method').trim(), icon: String(req.body.icon || '💳').trim().slice(0,8), key: String(req.body.key || 'MANUAL').trim().toUpperCase().replace(/\s+/g,'_'), address: String(req.body.address || '').trim(), details: String(req.body.details || '').trim(), active: true };
   db.paymentMethods.push(m);
   saveData();
   redirectMsg(res, '/admin-web/methods', 'Payment method added');
@@ -12701,6 +12719,7 @@ app.post('/admin-web/methods/:id/update', (req, res) => {
   m.name = String(req.body.name || m.name).trim();
   m.icon = String(req.body.icon || m.icon || '💳').trim().slice(0,8);
   m.key = String(req.body.key || m.key || 'MANUAL').trim().toUpperCase().replace(/\s+/g,'_');
+  m.address = String(req.body.address || '').trim();
   m.details = String(req.body.details || '').trim();
   m.active = String(req.body.active) === 'false' ? false : true;
   saveData();
