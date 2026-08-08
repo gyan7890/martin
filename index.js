@@ -3021,10 +3021,13 @@ function homeButtons(uid) {
     ],
     [
       { text: '👤 Profile', callback_data: 'profile' },
-      { text: '🧰 Tools', callback_data: 'user_tools' }
+      { text: '🎁 Freebie', callback_data: 'claim_freebie' }
     ],
     [
-      { text: '🆘 Support', callback_data: 'support' },
+      { text: '🧰 Tools', callback_data: 'user_tools' },
+      { text: '🆘 Support', callback_data: 'support' }
+    ],
+    [
       { text: '🧹 Clear Chat', callback_data: 'clear' }
     ]
   ];
@@ -3032,6 +3035,64 @@ function homeButtons(uid) {
   if (isAdmin(uid)) rows.push([{ text: '⚙️ Admin Panel', callback_data: 'admin' }]);
   return inline(rows);
 }
+
+async function showFreebie(chatId, from) {
+  const user = getUser(from);
+  if (isBannedUser(from.id)) return sendMessage(chatId, '🚫 Access blocked.', homeButtons(from.id));
+  
+  if (db.settings.freebieEnabled === false) {
+    return sendMessage(chatId, '🎁 <b>Freebies Currently Offline</b>\n\nDaily freebies are temporarily disabled by admin. Please check back later!', homeButtons(from.id));
+  }
+
+  const freebieAmount = Number(db.settings.freebieAmount || 5);
+  const nowTs = Date.now();
+  const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+  const lastClaim = Number(user.lastFreebieClaim || 0);
+  const timePassed = nowTs - lastClaim;
+
+  if (timePassed < COOLDOWN_MS) {
+    const remainingMs = COOLDOWN_MS - timePassed;
+    const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+    const mins = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    const text = `🎁 <b>Daily Freebie Reward</b>
+
+⏰ <b>Already Claimed Today!</b>
+
+You have already claimed your daily freebie reward. Come back tomorrow!
+
+⏳ <b>Next Claim Available In:</b> <code>${hours}h ${mins}m</code>
+💰 <b>Current Wallet Balance:</b> <b>${money(user.balance)}</b>
+🎁 <b>Total Freebies Claimed:</b> <b>${user.totalFreebiesClaimed || 0} times</b> (${money(user.freebieEarnings || 0)})`;
+
+    return sendMessage(chatId, text, inline([
+      [{ text: '🛍 Shop Products', callback_data: 'shop:1' }, { text: '🏠 Main Menu', callback_data: 'home' }]
+    ]));
+  }
+
+  user.lastFreebieClaim = nowTs;
+  user.totalFreebiesClaimed = (Number(user.totalFreebiesClaimed) || 0) + 1;
+  user.freebieEarnings = (Number(user.freebieEarnings) || 0) + freebieAmount;
+  user.balance = (Number(user.balance) || 0) + freebieAmount;
+  saveData();
+
+  const successText = `🎉 <b>Daily Freebie Claimed!</b>
+━━━━━━━━━━━━━━━━━━━━
+
+🎁 <b>Freebie Bonus:</b> <b>+${money(freebieAmount)}</b>
+👛 <b>New Wallet Balance:</b> <b>${money(user.balance)}</b>
+🏆 <b>Total Claims:</b> <b>${user.totalFreebiesClaimed}</b>
+
+You can use your wallet balance to buy any digital product or OTT subscription!
+
+⏰ <b>Next Claim Available:</b> 24 Hours`;
+
+  return sendMessage(chatId, successText, inline([
+    [{ text: '🛍 Shop Products', callback_data: 'shop:1' }],
+    [{ text: '🏠 Main Menu', callback_data: 'home' }]
+  ]));
+}
+
 
 function shopButtons(page = 1, userId = '') {
   const all = activeProducts();
@@ -8323,6 +8384,7 @@ Auto Verify fail ho gaya ya Reference Note add karna bhul gaye ho, to Binance ka
   if (data === 'user_tools') {
     return sendTrackedMessage(chatId, `🧰 <b>User Tools</b>\n\nManage your orders, payments, wallet history, referral link, notifications and product search.`, userToolsButtons(from.id));
   }
+  if (data === 'claim_freebie' || data === 'freebie') return showFreebie(chatId, from);
   if (data === 'user_top_deals') return showTopDeals(chatId, from);
   if (data === 'user_best_sellers') return showBestSellers(chatId, from);
   if (data === 'wallet_history') return showWalletHistory(chatId, from);
@@ -9420,6 +9482,7 @@ Too many messages. Try again after 1 minute.`);
 
   if (text === '/ping') return sendMessage(chatId, 'pong ✅ Bot is receiving messages.', homeButtons(from.id));
   if (text === '/start' || text.startsWith('/start ')) return showHome(chatId, from, text);
+  if (text === '/freebie' || text === '/claim' || text === '/daily') return showFreebie(chatId, from);
   if (text === '/myid' || text === '/id') return sendMessage(chatId, adminAccessDebugText(from));
   if (text === '/claimowner' || text === '/fixadmin') {
     if (forceOwnerIfAllowed(from)) return sendMessage(chatId, '✅ <b>Owner admin access recovered.</b>\n\nNow use /admin or tap Admin Panel.', adminButtons());
