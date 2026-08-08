@@ -3045,8 +3045,9 @@ async function showFreebie(chatId, from) {
   }
 
   const freebieAmount = Number(db.settings.freebieAmount || 5);
+  const cooldownHours = Math.max(1, Number(db.settings.freebieCooldownHours || 24));
   const nowTs = Date.now();
-  const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+  const COOLDOWN_MS = cooldownHours * 60 * 60 * 1000;
   const lastClaim = Number(user.lastFreebieClaim || 0);
   const timePassed = nowTs - lastClaim;
 
@@ -3059,7 +3060,7 @@ async function showFreebie(chatId, from) {
 
 ⏰ <b>Already Claimed Today!</b>
 
-You have already claimed your daily freebie reward. Come back tomorrow!
+You have already claimed your freebie reward. Come back when the cooldown finishes!
 
 ⏳ <b>Next Claim Available In:</b> <code>${hours}h ${mins}m</code>
 💰 <b>Current Wallet Balance:</b> <b>${money(user.balance)}</b>
@@ -3076,7 +3077,7 @@ You have already claimed your daily freebie reward. Come back tomorrow!
   user.balance = (Number(user.balance) || 0) + freebieAmount;
   saveData();
 
-  const successText = `🎉 <b>Daily Freebie Claimed!</b>
+  const successText = `🎉 <b>Freebie Reward Claimed!</b>
 ━━━━━━━━━━━━━━━━━━━━
 
 🎁 <b>Freebie Bonus:</b> <b>+${money(freebieAmount)}</b>
@@ -3085,7 +3086,7 @@ You have already claimed your daily freebie reward. Come back tomorrow!
 
 You can use your wallet balance to buy any digital product or OTT subscription!
 
-⏰ <b>Next Claim Available:</b> 24 Hours`;
+⏰ <b>Next Claim Available:</b> ${cooldownHours} Hours`;
 
   return sendMessage(chatId, successText, inline([
     [{ text: '🛍 Shop Products', callback_data: 'shop:1' }],
@@ -11241,6 +11242,7 @@ function filterSideNav() {
     <a href="/admin-web/coupons">🎟 Coupons</a>
 
     <div class="navCat">📢 Marketing & Community</div>
+    <a href="/admin-web/freebies">🎁 Freebies & Daily Rewards</a>
     <a href="/admin-web/flash-sales">⚡ Flash Sales</a>
     <a href="/admin-web/announce">📣 Announce</a>
     <a href="/admin-web/channels">📢 Channels</a>
@@ -11806,6 +11808,122 @@ app.post('/admin-web/easy-manage/notes/:id/delete', (req, res) => {
   db.adminNotes = (db.adminNotes || []).filter(x => x.id !== req.params.id);
   saveData();
   redirectMsg(res, '/admin-web/easy-manage', 'Note deleted');
+});
+
+// =====================
+// FREEBIE & REWARDS CONTROL
+// =====================
+app.get('/admin-web/freebies', (req, res) => {
+  const enabled = db.settings.freebieEnabled !== false;
+  const amount = Number(db.settings.freebieAmount || 5);
+  const cooldown = Number(db.settings.freebieCooldownHours || 24);
+
+  const usersList = Object.values(db.users || {});
+  const totalClaims = usersList.reduce((acc, u) => acc + (Number(u.totalFreebiesClaimed) || 0), 0);
+  const totalEarnings = usersList.reduce((acc, u) => acc + (Number(u.freebieEarnings) || 0), 0);
+  const activeClaimers = usersList.filter(u => (u.totalFreebiesClaimed || 0) > 0).length;
+
+  const topClaimers = usersList
+    .filter(u => (u.totalFreebiesClaimed || 0) > 0)
+    .sort((a, b) => (b.totalFreebiesClaimed || 0) - (a.totalFreebiesClaimed || 0))
+    .slice(0, 30)
+    .map(u => `<tr>
+      <td><b>${webEsc(u.firstName || 'User')}</b><br><span class="code">${webEsc(u.telegramId)}</span></td>
+      <td><span class="badge">🎁 ${u.totalFreebiesClaimed || 0}</span></td>
+      <td><b>${webMoney(u.freebieEarnings || 0)}</b></td>
+      <td>${u.lastFreebieClaim ? new Date(u.lastFreebieClaim).toLocaleString() : '-'}</td>
+      <td>
+        <form method="post" action="/admin-web/freebies/reset/${encodeURIComponent(u.telegramId)}">
+          <button class="btn secondary small">Reset Timer</button>
+        </form>
+      </td>
+    </tr>`).join('');
+
+  const body = `<div class="heroPanel">
+    <h2>🎁 Freebie & Daily Rewards Center</h2>
+    <div class="muted">Control freebie rewards, daily bonus credit, claim timers, and view claim statistics.</div>
+    <div class="kpiLine">
+      <span>Status: ${enabled ? '✅ Active' : '⛔ Offline'}</span>
+      <span>Daily Bonus: ${webMoney(amount)}</span>
+      <span>Cooldown: ${cooldown} Hours</span>
+      <span>Total Claims: ${totalClaims}</span>
+      <span>Total Distributed: ${webMoney(totalEarnings)}</span>
+    </div>
+  </div>
+
+  <div class="two">
+    <div class="card">
+      <h3>⚙️ Freebie Settings</h3>
+      <form method="post" action="/admin-web/freebies/settings">
+        <label><b>Freebie System Status</b></label>
+        <select name="enabled">
+          <option value="true" ${enabled ? 'selected' : ''}>✅ Enabled (Users can claim daily rewards)</option>
+          <option value="false" ${!enabled ? 'selected' : ''}>⛔ Disabled (Freebies offline)</option>
+        </select>
+        
+        <label><b>Daily Reward Amount (${webEsc(currency())})</b></label>
+        <input name="amount" type="number" step="0.01" value="${amount}" placeholder="5.00" required />
+        <p class="muted small">This bonus credit is added directly to user's wallet balance when claimed.</p>
+
+        <label><b>Claim Cooldown (Hours)</b></label>
+        <input name="cooldown" type="number" min="1" max="720" value="${cooldown}" placeholder="24" required />
+        <p class="muted small">Default: 24 hours (once per day).</p>
+
+        <button class="btn">Save Freebie Settings</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>📊 Freebie Overview Stats</h3>
+      <div class="stat">${totalClaims}</div>
+      <div class="muted">Total Freebies Claimed</div>
+      <br>
+      <div class="stat" style="color:var(--green);">${webMoney(totalEarnings)}</div>
+      <div class="muted">Total Bonus Given to Users</div>
+      <br>
+      <div class="stat" style="color:var(--purple);">${activeClaimers}</div>
+      <div class="muted">Active Claimers</div>
+    </div>
+  </div><br>
+
+  <div class="tableWrap">
+    <h3>🏆 Top Freebie Claimers</h3>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Claims</th>
+          <th>Total Earned</th>
+          <th>Last Claimed</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${topClaimers || '<tr><td colspan="5">No freebie claims yet. Users can claim from the bot menu!</td></tr>'}
+      </tbody>
+    </table>
+  </div>`;
+
+  res.send(adminLayout('Freebies & Daily Rewards', body, req.query.msg));
+});
+
+app.post('/admin-web/freebies/settings', (req, res) => {
+  db.settings.freebieEnabled = req.body.enabled === 'true';
+  const amt = Number(req.body.amount);
+  if (Number.isFinite(amt) && amt >= 0) db.settings.freebieAmount = amt;
+  const cd = Number(req.body.cooldown);
+  if (Number.isFinite(cd) && cd > 0) db.settings.freebieCooldownHours = cd;
+  saveData();
+  redirectMsg(res, '/admin-web/freebies', `Freebie settings saved! Amount: ${webMoney(db.settings.freebieAmount)}, Cooldown: ${db.settings.freebieCooldownHours}h`);
+});
+
+app.post('/admin-web/freebies/reset/:uid', (req, res) => {
+  const u = db.users ? db.users[req.params.uid] : null;
+  if (u) {
+    u.lastFreebieClaim = 0;
+    saveData();
+  }
+  redirectMsg(res, '/admin-web/freebies', `Freebie timer reset for user ${req.params.uid}`);
 });
 
 
