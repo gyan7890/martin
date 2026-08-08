@@ -3618,14 +3618,14 @@ function paymentFallbackButtons(paymentId) {
 function depositAmountButtons() {
   return inline([
     [
-      { text: '$5', callback_data: 'depamt:5' },
-      { text: '$10', callback_data: 'depamt:10' },
-      { text: '$20', callback_data: 'depamt:20' }
+      { text: money(5), callback_data: 'depamt:5' },
+      { text: money(10), callback_data: 'depamt:10' },
+      { text: money(20), callback_data: 'depamt:20' }
     ],
     [
-      { text: '$50', callback_data: 'depamt:50' },
-      { text: '$100', callback_data: 'depamt:100' },
-      { text: '$200', callback_data: 'depamt:200' }
+      { text: money(50), callback_data: 'depamt:50' },
+      { text: money(100), callback_data: 'depamt:100' },
+      { text: money(200), callback_data: 'depamt:200' }
     ],
     [{ text: '✍️ Custom Amount', callback_data: 'depcustom' }],
     [{ text: '🏠 Main Menu', callback_data: 'home' }]
