@@ -429,8 +429,12 @@ function sanitizeLoadedDb(d) {
   d.settings.alertFooterText ||= 'Fast checkout • Auto delivery • Premium support';
   Object.values(d.users || {}).forEach((u) => { u.banned = u.banned === true ? true : false; });
   d.paymentMethods ||= [];
-  if (!d.paymentMethods.some(m => m.key === 'UPI_PAY')) {
-    d.paymentMethods.unshift({ id: 'PM000', key: 'UPI_PAY', icon: '🇮🇳', name: 'UPI / PhonePe / GPay / Paytm', details: 'Pay instantly via UPI ID or QR Code. Enter UTR / Reference after payment.', active: true });
+  const bybitMethod = { id: 'PM_BYBIT', key: 'BYBIT_PAY', icon: '🟡', name: 'Bybit Pay (USDT Auto Verify)', details: 'Pay USDT via Bybit deposit or UID. Auto verified by Bybit V5 API instantly.', active: true };
+  if (!d.paymentMethods.some(m => m.key === 'BYBIT_PAY')) {
+    d.paymentMethods.unshift(bybitMethod);
+  } else {
+    const existing = d.paymentMethods.find(m => m.key === 'BYBIT_PAY');
+    if (existing) existing.active = true;
   }
   d.settings.upiId ||= process.env.UPI_ID || 'yourupi@paytm';
   d.settings.upiName ||= process.env.UPI_NAME || 'Global Store';
@@ -3177,6 +3181,7 @@ function safeDualVerifyEnabled() {
 
 function paymentMethodAddress(methodKey) {
   const key = String(methodKey || '').toUpperCase();
+  if (key === 'BYBIT_PAY' || key === 'BYBIT_USDT' || key === 'BYBIT') return db.settings.bybitUsdtAddress || process.env.BYBIT_USDT_ADDRESS || process.env.BYBIT_USDT_TRC20_ADDRESS || '';
   if (key === 'USDT_BEP20') return db.settings.bep20Address || '';
   if (key === 'BEP20') return db.settings.bep20Address || '';
   return '';
@@ -3184,6 +3189,7 @@ function paymentMethodAddress(methodKey) {
 
 function paymentMethodNetwork(methodKey) {
   const key = String(methodKey || '').toUpperCase();
+  if (key === 'BYBIT_PAY' || key === 'BYBIT_USDT' || key === 'BYBIT') return 'USDT (TRC20 / BEP20) · Bybit API Auto Verify';
   if (key === 'USDT_BEP20') return 'BEP20 / BSC';
   if (key === 'USDT_TRC20') return 'TRC20 / Tron';
   if (key === 'USDT_ERC20') return 'ERC20 / Ethereum';
@@ -3192,7 +3198,7 @@ function paymentMethodNetwork(methodKey) {
 }
 
 function verifyModeLine() {
-  return '🛡 <b>Safe Binance API Verify</b> — Auto verifies exact Reference Note from Binance API. If note is missing, TXID / Order ID is verified from Binance API.';
+  return '⚡ <b>Bybit V5 API Auto Verify</b> — Payment is auto-verified instantly via Bybit API using Reference Note or TXID / Hash.';
 }
 
 
