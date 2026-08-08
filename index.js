@@ -4562,11 +4562,100 @@ async function fetchAllBinanceTxs() {
     all.push(...await fetchDeposits(binanceCfg().coin));
   } catch (err) {
     autoVerifyLog('error', 'Capital deposit fetch failed', { error: err.response?.data || err.message });
-    throw err;
   }
-  // Optional endpoint; ignored if API permission/account does not support it.
   const payTxs = await fetchBinancePayTransactions();
   all.push(...payTxs);
+  return all;
+}
+
+// =====================
+// BYBIT AUTO VERIFY V5
+// =====================
+function bybitCfg() {
+  return {
+    apiKey: db.settings.bybitApiKey || process.env.BYBIT_API_KEY || 'I4LQnHRcTSkwATueh1',
+    secretKey: db.settings.bybitSecretKey || process.env.BYBIT_SECRET_KEY || 'Mkav0oU7pvfZfj6dsjzXwF3t3ZbmrY6sEwu1',
+    baseUrl: db.settings.bybitBaseUrl || process.env.BYBIT_BASE_URL || 'https://api.bybit.com',
+    coin: String(db.settings.bybitCoin || process.env.BYBIT_COIN || 'USDT').toUpperCase(),
+    lookbackDays: Number(db.settings.bybitLookbackDays || 7)
+  };
+}
+
+function bybitSignature(timestamp, apiKey, recvWindow, queryString, secretKey) {
+  const preHash = `${timestamp}${apiKey}${recvWindow}${queryString}`;
+  return crypto.createHmac('sha256', secretKey || '').update(preHash).digest('hex');
+}
+
+async function fetchBybitDeposits(coin) {
+  const cfg = bybitCfg();
+  if (!cfg.apiKey || !cfg.secretKey) throw new Error('Bybit API key/secret missing.');
+  
+  const timestamp = Date.now();
+  const recvWindow = 20000;
+  const endTime = timestamp;
+  const startTime = endTime - cfg.lookbackDays * 24 * 60 * 60 * 1000;
+  
+  const targetCoin = (coin || cfg.coin).toUpperCase();
+  const params = new URLSearchParams({
+    coin: targetCoin,
+    startTime: String(startTime),
+    endTime: String(endTime),
+    limit: '50'
+  });
+  
+  const queryString = params.toString();
+  const sign = bybitSignature(timestamp, cfg.apiKey, recvWindow, queryString, cfg.secretKey);
+
+  const res = await axios.get(`${cfg.baseUrl}/v5/asset/deposit/query-record?${queryString}`, {
+    timeout: 15000,
+    headers: {
+      'X-BAPI-API-KEY': cfg.apiKey,
+      'X-BAPI-TIMESTAMP': String(timestamp),
+      'X-BAPI-RECV-WINDOW': String(recvWindow),
+      'X-BAPI-SIGN': sign
+    }
+  });
+
+  if (res.data && res.data.retCode === 0 && res.data.result && Array.isArray(res.data.result.rows)) {
+    return res.data.result.rows.map(r => ({
+      source: 'bybit_deposit',
+      txId: String(r.txID || r.txId || r.id || '').trim(),
+      amount: Number(r.amount || 0),
+      coin: String(r.coin || targetCoin).toUpperCase(),
+      time: Number(r.successTime || r.createTime || Date.now()),
+      status: Number(r.status) === 3 ? 'success' : String(r.status),
+      note: String(r.memo || r.remark || '').trim(),
+      raw: r
+    }));
+  }
+  return [];
+}
+
+async function fetchAllCryptoTxs() {
+  const all = [];
+  
+  // 1. Binance Txs
+  try {
+    const bCfg = binanceCfg();
+    if (bCfg.apiKey && bCfg.secretKey) {
+      const bTxs = await fetchAllBinanceTxs();
+      all.push(...bTxs);
+    }
+  } catch (err) {
+    autoVerifyLog('warn', 'Binance deposit fetch skipped: ' + err.message);
+  }
+
+  // 2. Bybit Txs
+  try {
+    const yCfg = bybitCfg();
+    if (yCfg.apiKey && yCfg.secretKey) {
+      const bybitTxs = await fetchBybitDeposits(yCfg.coin);
+      all.push(...bybitTxs);
+    }
+  } catch (err) {
+    autoVerifyLog('warn', 'Bybit deposit fetch skipped: ' + err.message);
+  }
+
   return all;
 }
 
@@ -4669,7 +4758,7 @@ async function verifyPayment(payment) {
   const createdMs = paymentCreatedMs(payment);
   const maxAgeMs = Number(cfg.autoVerifyMaxAgeHours || 24) * 60 * 60 * 1000;
 
-  const txs = await fetchAllBinanceTxs();
+  const txs = await fetchAllCryptoTxs();
   const baseCandidates = txs.filter(tx => {
     if (!amountMatches(tx.amount, requiredAmount)) return false;
     if (String(tx.coin || cfg.coin).toUpperCase() !== String(cfg.coin).toUpperCase()) return false;
@@ -13026,7 +13115,7 @@ app.get('/admin-web/auto-verify', (req, res) => {
   const logs = (db.autoVerifyLogs || []).slice(0, 80).map(l => `<tr><td><b>${webEsc(l.type)}</b><br><span class="muted">${webEsc(new Date(l.at).toLocaleString())}</span></td><td>${webEsc(l.message)}</td><td><span class="code">${webEsc(JSON.stringify(l.data || {})).slice(0, 220)}</span></td></tr>`).join('');
   const pendingRows = pending.slice(0, 100).map(p => `<tr><td><b>${webEsc(p.id)}</b><br>${webEsc(p.type || 'order')}</td><td>${webEsc(p.telegramId)}</td><td>${webEsc(p.productName || 'Wallet Deposit')}</td><td>${webMoney(p.amount)}</td><td>${webEsc(p.status)}<br><span class="muted">${webEsc(short(p.lastCheckReason || '', 80))}</span></td><td><form method="post" action="/admin-web/auto-verify/check/${encodeURIComponent(p.id)}"><button class="btn">Check Now</button></form></td></tr>`).join('');
   const body = `<div class="heroPanel"><h2>🤖 Full Auto Binance Verifier</h2><div class="muted">Auto checks deposits/orders and delivers without admin approval when Binance API returns matching transaction.</div><div class="kpiLine"><span>Scanner ${db.settings.autoVerifyEnabled === false ? 'OFF' : 'ON'}</span><span>${pending.length} pending scan</span><span>Interval ${db.settings.autoVerifyIntervalSec || 25}s</span><span>No TXID ${db.settings.noTxidMode === false ? 'OFF' : 'ON'}</span><span>Unique Amount ${db.settings.uniqueAmountEnabled === true ? 'ON' : 'OFF'}</span></div></div>
-  <div class="quick"><form method="post" action="/admin-web/auto-verify/run"><button class="btn">Run Scanner Now</button></form><form method="post" action="/admin-web/auto-verify/test-binance"><button class="btn secondary">Test Binance API</button></form><a class="btn secondary" href="/admin-web/settings">Auto Verify Settings</a></div><br>
+  <div class="quick"><form method="post" action="/admin-web/auto-verify/run"><button class="btn">Run Scanner Now</button></form><form method="post" action="/admin-web/auto-verify/test-binance"><button class="btn secondary">Test Binance API</button></form><form method="post" action="/admin-web/auto-verify/test-bybit"><button class="btn secondary">Test Bybit API</button></form><a class="btn secondary" href="/admin-web/settings">Auto Verify Settings</a></div><br>
   <div class="tableWrap"><h3>⏳ Pending Auto Scan</h3><table class="table"><thead><tr><th>Payment</th><th>User</th><th>Item</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>${pendingRows || '<tr><td colspan="6">No pending auto payments.</td></tr>'}</tbody></table></div><br>
   <div class="tableWrap"><h3>📜 Auto Verify Logs</h3><table class="table"><thead><tr><th>Type</th><th>Message</th><th>Data</th></tr></thead><tbody>${logs || '<tr><td colspan="3">No logs yet.</td></tr>'}</tbody></table></div>`;
   res.send(adminLayout('Auto Verify', body, req.query.msg));
@@ -13065,6 +13154,17 @@ app.post('/admin-web/auto-verify/test-binance', async (req, res) => {
   } catch (err) {
     autoVerifyLog('error', 'Binance API test failed', { error: err.response?.data || err.message });
     redirectMsg(res, '/admin-web/auto-verify', 'Binance API failed: ' + err.message);
+  }
+});
+
+app.post('/admin-web/auto-verify/test-bybit', async (req, res) => {
+  try {
+    const txs = await fetchBybitDeposits();
+    autoVerifyLog('info', `Bybit API test OK. Found ${txs.length} recent deposit(s).`, { count: txs.length });
+    redirectMsg(res, '/admin-web/auto-verify', `Bybit API OK. Found ${txs.length} recent deposit(s).`);
+  } catch (err) {
+    autoVerifyLog('error', 'Bybit API test failed', { error: err.response?.data || err.message });
+    redirectMsg(res, '/admin-web/auto-verify', 'Bybit API failed: ' + err.message);
   }
 });
 
