@@ -6170,17 +6170,18 @@ function premiumAlertHighlights(product, max = 4) {
 }
 
 function defaultStockAlertText(product, addedCount = 0) {
-  const price = money(getProductPrice(product, ''), product.currency || currency());
-  const link = productDeepLink(product.code);
-  return `📊 <b>${escapeHtml(addedCount || 0)} new stock added for ${escapeHtml(product.name)}!</b>\n\n` +
-    `🌀 <b>Available:</b> ${(product.stock || []).length} items\n` +
-    `💐 <b>Price:</b> ${price}\n\n` +
-    `${productLogoHtml(product)} <b>${escapeHtml(product.name)}</b> is live now.\n` +
-    `⚡ <b>Fresh stock just arrived — grab before it ends.</b>\n\n` +
-    `✨ <b>Highlights:</b>\n${premiumAlertHighlights(product, 3)}\n\n` +
-    `${link ? `🛒 <b>Buy Link:</b> <a href="${escapeHtml(link)}">Tap here to buy now</a>\n` : ''}` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `🚀 <b>${escapeHtml(db.settings.alertFooterText || 'Fast checkout • Auto delivery • Premium support')}</b>`;
+  const icon = productLogoHtml(product) || '📦';
+  const name = escapeHtml(product.name);
+  const totalStock = (product.stock || []).length;
+  const unitPrice = money(getProductPrice(product, ''), product.currency || currency());
+
+  return `📣 <b>RESTOCKED</b>\n\n` +
+    `${icon} <b>${name}</b>\n\n` +
+    `<blockquote>` +
+    `🆕 <b>Newly added:</b> <b>${addedCount || 0}</b>\n` +
+    `⚡ <b>Available now:</b> <b>${totalStock}</b>\n` +
+    `💰 <b>Unit price:</b> <b>${unitPrice}</b>` +
+    `</blockquote>`;
 }
 
 function defaultGroupReplyText(product, trigger = '') {
@@ -6812,13 +6813,17 @@ function findProductByKeywordText(textValue = '') {
 function directBuyKeyboard(product, mode = 'group') {
   const link = productDeepLink(product.code);
   const bot = getBotUsername() || botUsername || BOT_USERNAME || '';
+  const icon = productLogo(product) || '🛒';
   const rows = [];
-  if (link) {
-    rows.push([styleButton({ text: `🛒 Buy ${short(product.name, 30)}`, url: link, ...buttonIconFields(product) }, 'success')]);
-    rows.push([{ text: '⚡ Direct Buy Link', url: link }]);
+  const buyUrl = link || (bot ? `https://t.me/${bot}?start=buy_${product.code}` : '');
+  
+  if (buyUrl) {
+    rows.push([{ text: `${icon} Buy ${product.name}`, url: buyUrl }]);
   }
-  if (db.settings.groupReplyWithShopButton !== false && bot) rows.push([{ text: '🛍 Open Full Store', url: `https://t.me/${bot}?start=shop` }]);
-  if (db.settings.groupReplyWithSupportButton !== false && db.settings.supportUsername) rows.push([{ text: '💬 Support', url: `https://t.me/${String(db.settings.supportUsername).replace('@','')}` }]);
+  if (mode === 'group') {
+    if (db.settings.groupReplyWithShopButton !== false && bot) rows.push([{ text: '🛍 Open Full Store', url: `https://t.me/${bot}?start=shop` }]);
+    if (db.settings.groupReplyWithSupportButton !== false && db.settings.supportUsername) rows.push([{ text: '💬 Support', url: `https://t.me/${String(db.settings.supportUsername).replace('@','')}` }]);
+  }
   return inline(rows.length ? rows : [[{ text: '🤖 Open Bot', url: `https://t.me/${bot}` }]]);
 }
 
