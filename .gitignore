@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.vercel
+*.log
+bot_stderr.log
+bot_stdout.log
+backups/
+manual-backup-*
+data.json
+index - Copy.js
+index - Copy - Copy.js
+.DS_Store

@@ -1,0 +1,1 @@
+Commands Added:\n/pay\n/upi\n\nAdd your UPI details in .env file.

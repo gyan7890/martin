@@ -1,0 +1,8 @@
+node_modules
+.env
+.global_ott_store_bot.lock
+bot_stdout.log
+bot_stderr.log
+backups
+manual-backup-before-zip-*
+*.zip

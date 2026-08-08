@@ -1,0 +1,19 @@
+{
+  "name": "globalottstore-bot-source-code-ready-to-host",
+  "version": "74.3.0",
+  "description": "Globalottstore bot source code ready to host with all features and setup instructions.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "check": "node --check index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongodb": "^6.8.0"
+  }
+}

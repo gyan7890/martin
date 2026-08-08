@@ -1,0 +1,218 @@
+GLOBALOTTSTORE BOT SOURCE CODE — READY TO HOST
+=============================================
+
+This package includes the full bot source code with all features. The buyer only needs to add their own bot/store details, products, stock and payment methods.
+
+FILES INCLUDED
+--------------
+index.js
+package.json
+.env
+.env.example
+data.json
+HOSTING_INSTRUCTIONS.txt
+README.txt
+
+STEP 1 — CREATE TELEGRAM BOT
+----------------------------
+1. Open Telegram and search @BotFather
+2. Send /newbot
+3. Create bot name and username
+4. Copy the bot token
+5. Put token in .env:
+   BOT_TOKEN=your_token_here
+   BOT_USERNAME=your_bot_username_without_@
+
+STEP 2 — GET ADMIN TELEGRAM ID
+------------------------------
+Use @userinfobot or any Telegram ID bot to get numeric Telegram ID.
+
+Put it in .env:
+ADMIN_ID=your_numeric_telegram_id
+
+Optional:
+ADMIN_USERNAMES=yourusername
+
+STEP 3 — EDIT .env FILE
+-----------------------
+Open .env and change these values:
+
+BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN_HERE
+BOT_USERNAME=YOUR_BOT_USERNAME_WITHOUT_@
+ADMIN_ID=YOUR_TELEGRAM_NUMERIC_ID
+STORE_NAME=Your Store Name
+SUPPORT_USERNAME=@YourSupportUsername
+CHANNEL_URL=https://t.me/YourChannel
+WEB_BASE_URL=https://your-domain.com
+ADMIN_WEB_USER=admin
+ADMIN_WEB_PASSWORD=ChangeThisStrongPassword123
+
+Important:
+- Do not share BOT_TOKEN publicly.
+- Change ADMIN_WEB_PASSWORD before giving access to anyone.
+
+STEP 4 — HOSTING SETUP
+----------------------
+For Vercel (Recommended 24/7 Serverless - Free & No Local PC Required):
+1. Import repository into Vercel.
+2. Add Environment Variables in Vercel:
+   BOT_TOKEN, ADMIN_ID, STORE_NAME, SUPPORT_USERNAME, WEB_BASE_URL, MONGODB_URI
+3. Deploy.
+4. Activate Webhook in browser:
+   https://your-app.vercel.app/api/set-webhook
+5. Check VERCEL_SETUP.md for full step-by-step MongoDB Atlas free setup guide.
+
+For VPS / Local Server:
+1. Extract ZIP
+2. Run:
+   npm install
+   npm start
+
+For Hostinger / Node.js hosting:
+1. Upload all extracted files
+2. Set startup file:
+   index.js
+3. Add environment variables from .env into hosting panel
+4. Start / Restart app
+
+STEP 5 — OPEN BOT ADMIN PANEL
+-----------------------------
+After hosting, open your Telegram bot and send:
+
+/claimowner
+/admin
+
+If admin does not open, send:
+/myid
+
+Then set that numeric ID as ADMIN_ID and restart app.
+
+STEP 6 — OPEN WEB ADMIN PANEL
+-----------------------------
+Open:
+
+https://your-domain.com/admin-web
+
+Login using:
+ADMIN_WEB_USER
+ADMIN_WEB_PASSWORD
+
+STEP 7 — ADD STORE DATA
+-----------------------
+Web Admin → Products
+- Add products
+- Add price
+- Add delivery format
+- Add description
+- Add logo/emoji/brand code if needed
+
+Web Admin → Stock Manager
+- Add stock
+- Supported formats:
+  Redeem Link
+  ID|Password
+  Mail|Pass
+  Mail|Pass|2FA
+  Mail|ChatGPT Pass|Mail Pass|2FA
+  Coupon
+  Any custom format
+
+Web Admin → Payment Methods
+- Add payment methods
+- Add Binance / USDT / UPI manual payment details
+- Add BEP20 address if needed
+
+STEP 8 — GROUP ALERT SETUP
+--------------------------
+1. Add bot to group
+2. In group send:
+   /groupid
+   /alerton
+   /keywordon
+
+For keyword replies like Gemini/ChatGPT:
+1. Open @BotFather
+2. /setprivacy
+3. Select your bot
+4. Disable privacy mode
+
+STEP 9 — CHANNEL ALERT SETUP
+----------------------------
+1. Add bot to channel as admin
+2. Enable Post Messages permission
+3. Add channel ID/URL in Web Admin settings
+
+STEP 10 — TEAM WEB ACCESS
+-------------------------
+Web Admin → Team Web Access
+
+You can give team members web panel access and select exactly which pages they can open.
+
+Telegram command:
+/setwebpass ADMIN_ID password
+/webteam
+
+MAIN FEATURES INCLUDED
+----------------------
+✅ Telegram app admin panel
+✅ Web admin panel
+✅ Product manager
+✅ Stock manager
+✅ Bulk Data Helper
+✅ Easy Manage Center
+✅ Team web access + custom permissions
+✅ Payment methods
+✅ Binance safe auto verify + TXID fallback
+✅ BEP20 support
+✅ Stock Wait Queue
+✅ Paid waiting orders auto-deliver first after stock added
+✅ 30-minute pending payment expiry
+✅ Safe Delivery Center
+✅ Failed delivery retry
+✅ Health + Speed Checker
+✅ Security Scan
+✅ Group alerts
+✅ Keyword auto reply with direct buy button
+✅ Channel alerts
+✅ Premium stock alert messages
+✅ Flash sale messages
+✅ Custom delivery message templates
+✅ Delivery preview/edit
+✅ Access link / website / instructions in delivery
+✅ Bulk pricing
+✅ Coupons
+✅ Replacement request approval
+✅ Order history
+✅ User history
+✅ Notes / tasks
+✅ Backup / export tools
+✅ Custom emoji / brand code support
+
+QUICK COMMANDS
+--------------
+/start
+/admin
+/claimowner
+/myid
+/manage
+/datahelper
+/stockwait
+/healthcheck
+/safedelivery
+/groups
+/testgroups
+/featurecheck
+
+SUPPORT NOTE FOR BUYER
+----------------------
+First add:
+1. BOT_TOKEN
+2. ADMIN_ID
+3. ADMIN_WEB_PASSWORD
+4. STORE_NAME
+5. SUPPORT_USERNAME
+6. Products
+7. Payment methods
+8. Stock
+
+Then the bot is ready to use.
